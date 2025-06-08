@@ -1,0 +1,20 @@
+{
+  "name": "fintrak",
+  "version": "1.0.0",
+  "description": "Pull bank statements and parse to csv for gnucash import",
+  "homepage": "https://github.com/mishrasidhant/fintrak#readme",
+  "bugs": {
+    "url": "https://github.com/mishrasidhant/fintrak/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mishrasidhant/fintrak.git"
+  },
+  "license": "MIT",
+  "author": "Sidhant Dixit",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
