@@ -12,9 +12,16 @@
   },
   "license": "MIT",
   "author": "Sidhant Dixit",
-  "type": "commonjs",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "del": "^8.0.0",
+    "dotenv": "^16.5.0",
+    "puppeteer": "^24.10.0",
+    "sharp": "^0.34.2",
+    "util": "^0.12.5"
   }
 }
