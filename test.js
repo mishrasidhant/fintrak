@@ -13,24 +13,25 @@ const launchAllPages = (async () => {
 		await browser.disconnect();
 	}
 
-
-	// const page1 = await browser.newPage();
-	// const page2 = await browser.newPage();
-	// const page3 = await browser.newPage();
-	// await page1.goto('https://google.com')
-	// await page2.goto('https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_selectors')
-	// await page3.goto('https://backbonejs.org/')
-
+	/*
 	const pages = [
-		'https://www.simplii.com/en/home.html',
-		'https://www.tangerine.ca/app/#/login/login-id?locale=en_CA',
-		'https://www.tangerine.ca/en/personal',
-		'https://www.mbna.ca/en'
+		'https://www.google.com',
+		'https://www.firefox.com',
 	]
 	await Promise.all(pages.map(async (el) =>{
 		const page = await browser.newPage()
 		await page.goto(el)
 	}))
+	*/
+
+/*
+	const page1 = await browser.newPage();
+	const page2 = await browser.newPage();
+	const page3 = await browser.newPage();
+	await page1.goto('https://google.com')
+	await page2.goto('https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_selectors')
+	await page3.goto('https://backbonejs.org/')
+*/
 	return { browserWSEndpoint, cleanup }
 })()
 
@@ -100,3 +101,29 @@ const { browserWSEndpoint, cleanup } = await launchAllPages
 */
   await browser.close();
 })();
+
+/* Log here things that didn't work!!
+## Trying to access dropdown values
+// Simplii estatement list dropdown values
+
+	// No shadowRoot exists
+	const shadowRoot = await selectElement.evaluate(el  => el.shadowRoot)
+	if (shadowRoot){
+		const options = await shadowRoot.$$('option')
+		console.log(`Shadow Dom found : length - ${options.length}`)
+		console.log(options)
+	}
+
+
+	// Times out
+	await page.waitForSelector('#ember1247-field option', {visible: true})
+
+
+	// Error [TypeError]: option.textContent is not a function - at page.$$eval
+	const optionsEvalList = await page.$$eval('#ember1247-field option', options => 
+		options.map(option => ({text: option.textContent().trim(), value: option.value}))
+	)
+	console.log(`found ${optionsEvalList.length} options`)
+	console.log(optionsEvalList)
+
+*/

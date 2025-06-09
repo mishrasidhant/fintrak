@@ -1,5 +1,6 @@
 // Create the browser instance and open all pages
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer'
+
 import 'dotenv/config'
 
 function delay(ms){
@@ -10,7 +11,8 @@ const launchAllPages = (async () => {
 	const browser = await puppeteer.launch(
 		{
 			headless: false,
-			defaultViewport: {width: 1080, height: 1024}	
+			defaultViewport: {width: 1280, height: 999},
+			// browser: 'firefox',
 		}
 	)
 	const browserWSEndpoint = browser.wsEndpoint()
@@ -19,30 +21,18 @@ const launchAllPages = (async () => {
 		console.log('Disconnecting puppetere instance from browser');
 		await browser.disconnect();
 	}
-/*
-	const pages = [
-		'https://www.simplii.com/en/home.html',
-		// 'https://www.tangerine.ca/app/#/login/login-id?locale=en_CA',
-		// 'https://www.tangerine.ca/en/personal',
-		// 'https://www.mbna.ca/en'
-	]
-	await Promise.all(pages.map(async (el) =>{
-		const page = await browser.newPage()
-		await page.goto(el)
-	}))
-*/
 	// Create page for first bank and sign-in
 	const page = await browser.newPage()
+	await delay(10000)
 	await page.goto(process.env.SIMPLII_URL)
+	await delay(10000)
 	await page.locator('#onetrust-accept-btn-handler').click();
-	await page.locator('#sign-on').click();
-	// #card-number-08012640  vs  #card-number-fd795132  - different for ffx and chrome
-	// use partial selector matching
+	await page.locator('#sign-on').click()
 	await page.locator('[id^="card-number"]').fill(process.env.SIMPLII_UN)
-	// #password-08012640 vs #password-fd795132 - ""
+	await page.locator('[id^="card-number"]').fill(process.env.SIMPLII_UN)
+	// #password-08012640 vs #password-fd795132 : "the suffix is browser dependant :dynamic"
 	await page.locator('[id^="password"]').fill(process.env.SIMPLII_PW)
-	// await page.locator('#button-1516987113640').hover();
-
+	await page.locator('#button-1516987113640').click();
 	return { browserWSEndpoint, cleanup }
 })()
 

@@ -1,4 +1,5 @@
-import puppeteer from "puppeteer";
+import puppeteer from 'puppeteer'
+import {writeFile} from 'node:fs'
 import 'dotenv/config'
 
 const browserWSEndpoint = process.argv[2];
@@ -7,18 +8,19 @@ function delay(ms){
 	return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function debugFile(file, content){
+	writeFile(file, content, 'utf8', (err) => {
+		if (err) throw err;
+		console.log(`Successfully wrote file :${file}`)
+	});
+}
+
 const connectToPages = (async (browserWSEndpoint, cleanup) => {
-	// const {browserWSEndpoint, cleanup} = await launchAllPages
 	console.log(browserWSEndpoint)
 	const browser = await puppeteer.connect({
 		browserWSEndpoint: browserWSEndpoint,
-		defaultViewport: {width: 1080, height: 1024},
+		defaultViewport: {width: 1280, height: 999},
 	})
-	console.log('At this point we have 2 puppetere instances connected to the browser')
-	// TODO Implement when attach logic has access to the initial page launch context, 
-	// for now the initial page launch logic handles it's own cleanup
-	// await cleanup() 
-	// console.log('At this point we should have 1 puppetere instance connected to the browser')
 
 	const pages = await browser.pages();
 	console.log("Open pages: ", pages.map(p => p.url()));
@@ -27,8 +29,46 @@ const connectToPages = (async (browserWSEndpoint, cleanup) => {
 	const simpliiPage = pages.filter(p =>  p.url().includes(process.env.SIMPLII_URL_INCLUDES))
 	const page = simpliiPage[0]
 
-	await page.locator('#button-1516987113640').hover();
-	delay(2000)
+	const statementLink = await page.locator('[data-test-id="olb-extras-view-estatements"]')
+	await statementLink.scroll()
+	delay(10000)
+	await statementLink.click()
+	await page.waitForNetworkIdle();
+	console.log('network idle complete')
+
+	// #ember1232 > div.online-statements > div.account-selector-section > div.account-list
+	// #ember1247 : ui-select
+	// #ember1247-field : select
+	// #ember1253 : option
+	// div.account-list ui-select
+	// const options = await page.$$('#ember1246-field option');
+
+/*
+	// THIS WORKS!! -> but promise.All is more performant -> although I like the readability here
+	const options = await page.$$('#ember1247-field option');
+	console.log(`found ${options.length} options`)
+
+	for (const option of options){
+		const value = await option.evaluate(el => el.value)
+		const text = await option.evaluate(el => el.textContent.trim())
+		const text2 = await option.evaluate(el => el.text)
+		optionsList.push({value, text, text2});
+	}
+
+	console.log(optionsList)
+*/
+
+	const optionsList = await page.$$eval('#ember1247-field option', async opts => 
+		Promise.all(opts.map(async opt => ({
+			value: opt.value,
+			text: opt.textContent.trim(),
+		})))
+	);
+	console.log(optionsList)
+
+	delay(10000)
+
+
 	await browser.disconnect()
 })(browserWSEndpoint, () => { console.log('cleanup invoked)')})
 
