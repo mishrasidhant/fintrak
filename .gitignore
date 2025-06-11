@@ -138,3 +138,5 @@ dist
 # Local files
 prompt.md
 *.html
+download_dir
+*.out
