@@ -62,30 +62,34 @@ const connectToPages = (async (browserWSEndpoint, cleanup) => {
 	const page = simpliiPage[0];
 
 	// Redirect Chrome's download manager
+	// const browserTarget = browser.targets().find(t => t.type() === 'browser');
+	// const downloadSession = await browserTarget.createCDPSession();
 	const downloadSession = await browser.target().createCDPSession();
 	await downloadSession.send('Browser.setDownloadBehavior', {
 		behavior: 'allow',
 		downloadPath: downloadDir,
 		eventsEnabled: true,
 	})
-	// holds { downloadId, suggestedFilename}
-	let downloadCtx = {};
-	downloadSession.on('Browser.downloadWillBegin', (event) => {
-		console.log(`⚡ download will begin → ${event}`);
-		downloadCtx.downloadId = event.downloadId;
-		downloadCtx.suggestedFilename = event.suggestedFilename;
-	})
-	// await this in downloadStatement before renaming
-	downloadSession.on('Browser.downloadProgress', (event) => {
-		if (event.state === 'completed' && event.downloadId === downloadCtx.downloadId) {
-			console.log(`⚡ download completed → ${event}`);
-			const oldPath = path.join(downloadDir, downloadCtx.suggestedFilename)
-			const newName = `${downloadCtx.bank}_${downloadCtx.formattedAccount}_${downloadCtx.year}_${downloadCtx.month}_statement.pdf}`
-			const newPath = path.join(downloadDir, newName);
-			renameSync(oldPath, newPath);
-			console.log(`✅ download complete -> renamed to ${newName}`)
-		}
-	})
+	/*
+		// holds { downloadId, suggestedFilename}
+		let downloadCtx = {};
+		downloadSession.on('Browser.downloadWillBegin', (event) => {
+			console.log('⚡ download will begin →', event);
+			downloadCtx.downloadId = event.downloadId;
+			downloadCtx.suggestedFilename = event.suggestedFilename;
+		})
+		// await this in downloadStatement before renaming
+		downloadSession.on('Browser.downloadProgress', (event) => {
+			if (event.state === 'completed' && event.downloadId === downloadCtx.downloadId) {
+				console.log('⚡ download completed →', event);
+				const oldPath = path.join(downloadDir, downloadCtx.suggestedFilename)
+				const newName = `${downloadCtx.bank}_${downloadCtx.formattedAccount}_${downloadCtx.year}_${downloadCtx.month}_statement.pdf}`
+				const newPath = path.join(downloadDir, newName);
+				renameSync(oldPath, newPath);
+				console.log(`✅ download complete -> renamed to ${newName}`)
+			}
+		})
+	*/
 
 	/*
 	// Puppetere page response iterception couldn't handle pdf download
@@ -246,39 +250,83 @@ const connectToPages = (async (browserWSEndpoint, cleanup) => {
 			yearData.statementData = buttonsData;
 		}
 	};
-	const downloadStatement = async function (opts) {
-		const {
-			year,
-			formattedAccount,
-			bank
-		} = opts
-		for (const buttonData of opts.statementData) {
-			const {
+	const downloadStatement = async function ({
+		year,
+		formattedAccount,
+		bank,
+		statementData
+	}) {
+		for (const {
 				month,
 				clickableId
-			} = buttonData
-			downloadCtx = {
-				bank,
-				formattedAccount,
-				year,
-				month
-			};
+			} of statementData) {
 			const randomMs = Math.floor(Math.random() * (5000 - 1000 + 1)) + 1000
+
+			const download = new Promise((resolve, reject) => {
+				let thisDownloadId, thisSuggestedFilename;
+
+				const onDownloadWillBegin = event => {
+					console.log('⚡ download will begin → ', JSON.stringify(event));
+					thisDownloadId = event.downloadId;
+					thisSuggestedFilename = event.suggestedFilename
+				}
+				const onDownloadProgress = event => {
+					console.log('DEBUG: onDownloadProgress - event = ', JSON.stringify(event))
+					if (event.downloadId === thisDownloadId && event.state === 'completed') {
+						console.log('⚡ download completed');
+						// Cleanup events for this instance
+						downloadSession.off('Browser.downloadWillBegin', onDownloadWillBegin)
+						downloadSession.off('Browser.downloadProgress', onDownloadProgress)
+						clearTimeout(timeout)
+						resolve(thisSuggestedFilename)
+					}
+				}
+				downloadSession.on('Browser.downloadWillBegin', onDownloadWillBegin)
+				downloadSession.on('Browser.downloadProgress', onDownloadProgress)
+
+				const timeout = setTimeout(() => {
+					downloadSession.off('Browser.downloadWillBegin', onDownloadWillBegin)
+					downloadSession.off('Browser.downloadProgress', onDownloadProgress)
+					reject(new Error(`Download Timedout for ${bank}_${formattedAccount}_${year}_${month}_statement.pdf`))
+				}, 30000)
+			});
+
+			// Delay
 			await delay(randomMs)
 			console.log('Delaying for : ', Math.floor(randomMs / 1000), ' seconds')
+			// Trigger the download
+			await page.waitForSelector(`#${clickableId}`, {
+				visible: true
+			})
+			console.log(`Attempting to click button with ID:  ${clickableId}`)
+			await page.click(`#${clickableId}`)
+
+			const oldName = await download;
+			const oldPath = path.join(downloadDir, oldName)
+			const newName = `${bank}_${formattedAccount}_${year}_${month}_statement.pdf`
+			const newPath = path.join(downloadDir, newName);
+			renameSync(oldPath, newPath);
+			console.log(`✅ Renamed ${oldName} -> ${newName}`)
+
+			// const fileName = `${bank}_${formattedAccount}_${year}_${month}_statement.pdf`
+			// const filePath = path.join(downloadDir, fileName);
+			// writeFileSync(filePath, pdfBuffer);
+			// console.log(`Saved PDF: ${filePath}`)
+
 
 			// await on CDP downloadProgress event
-			const done = new Promise(resolve => {
-				downloadSession.once('Browser.downloadProgress', ({
-					downloadId,
-					state
-				}) => {
-					if (state === 'completed' && downloadId === downloadCtx.downloadId) {
-						return resolve();
-					}
-				})
-			})
-
+			/*
+						const done = new Promise(resolve => {
+							downloadSession.once('Browser.downloadProgress', ({
+								downloadId,
+								state
+							}) => {
+								if (state === 'completed' && downloadId === downloadCtx.downloadId) {
+									return resolve();
+								}
+							})
+						})
+			*/
 			// Build a promise that will resolve for "this" PDF download - one-shot handler
 			/*
 			const pdfPromise = new Promise((resolve, reject) => {
@@ -380,14 +428,6 @@ const connectToPages = (async (browserWSEndpoint, cleanup) => {
 						});
 			*/
 
-			// Trigger the download
-			await page.waitForSelector(`#${clickableId}`, {
-				visible: true
-			})
-			console.log(`Attempting to click button with ID:  ${clickableId}`)
-			await page.click(`#${clickableId}`)
-
-			await done; // now the file's on disk and already
 
 			/*
 			const {
