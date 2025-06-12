@@ -27,6 +27,27 @@ function checkDownloadPath(downloadDir) {
 	}
 }
 
+function informErrors(bankData) {
+	for (const acc of bankData) {
+		for (const yearData of acc) {
+			const failures = yearData.statementData.filter(stmt => stmt.error);
+			if (failures.length) {
+				const account = yearData.formattedAccount
+				const year = yearData.year
+				console.warn(`Account ${account} - Year ${year} hadd ${failures.length} failures`)
+				const monthlyFailures = failures.map(f => ({
+					month: f.month,
+					error: f.error,
+				}))
+				monthlyFailures.forEach(f => {
+					const serialErr = JSON.stringify(f.error)
+					console.warn(`Month: ${f.month} - Error: ${serialErr}`)
+				});
+			}
+		}
+	}
+}
+
 const connectToPages = (async (browserWSEndpoint, cleanup) => {
 	const cfgAccList = process.env.SIMPLII_ACC_LIST.split(",");
 	const startYear = parseInt(process.env.SIMPLII_START_YEAR || "2018", 10);
@@ -133,12 +154,19 @@ const connectToPages = (async (browserWSEndpoint, cleanup) => {
 		bank,
 		statementData
 	}) {
-		for (const {
+		for (const stmt of statementData) {
+			stmt.error = null;
+			stmt.fileName = null;
+			const {
 				month,
 				clickableId
-			} of statementData) {
-			const randomMs = Math.floor(Math.random() * (5000 - 1000 + 1)) + 1000
+			} = stmt
 
+			const newName = `${bank}_${formattedAccount}_${year}_${month}_statement.pdf`
+			const newPath = path.join(downloadDir, newName);
+			const randomMs = Math.floor(Math.random() * (3000 - 1000 + 1)) + 1000
+
+			let cleanupHandler;
 			const download = new Promise((resolve, reject) => {
 				let thisDownloadId, thisSuggestedFilename;
 
@@ -148,40 +176,71 @@ const connectToPages = (async (browserWSEndpoint, cleanup) => {
 					thisSuggestedFilename = event.suggestedFilename
 				}
 				const onDownloadProgress = event => {
-					console.log('DEBUG: onDownloadProgress - event = ', JSON.stringify(event))
+					// console.log('DEBUG: onDownloadProgress - event = ', JSON.stringify(event))
 					if (event.downloadId === thisDownloadId && event.state === 'completed') {
 						console.log('⚡ download completed');
-						// Cleanup events for this instance
-						downloadSession.off('Browser.downloadWillBegin', onDownloadWillBegin)
-						downloadSession.off('Browser.downloadProgress', onDownloadProgress)
-						clearTimeout(timeout)
+						cleanupHandler()
 						resolve(thisSuggestedFilename)
 					}
 				}
-				downloadSession.on('Browser.downloadWillBegin', onDownloadWillBegin)
-				downloadSession.on('Browser.downloadProgress', onDownloadProgress)
 
 				const timeout = setTimeout(() => {
 					downloadSession.off('Browser.downloadWillBegin', onDownloadWillBegin)
 					downloadSession.off('Browser.downloadProgress', onDownloadProgress)
 					reject(new Error(`Download Timedout for ${bank}_${formattedAccount}_${year}_${month}_statement.pdf`))
 				}, 30000)
+
+				cleanupHandler = () => {
+					clearTimeout(timeout)
+					downloadSession.off('Browser.downloadWillBegin', onDownloadWillBegin)
+					downloadSession.off('Browser.downloadProgress', onDownloadProgress)
+				}
+
+				downloadSession.on('Browser.downloadWillBegin', onDownloadWillBegin)
+				downloadSession.on('Browser.downloadProgress', onDownloadProgress)
 			});
 
-			// Delay
-			await delay(randomMs)
-			console.log('Delaying for : ', Math.floor(randomMs / 1000), ' seconds')
+			// First network call made to download statement data
+			const firstResponse = page.waitForResponse(response => response.url() === 'https://online.simplii.com/ebm-ai/api/v1/json/eStatements' && response.request().method() === 'POST', {
+				timeout: 15000
+			})
 
-			// Trigger the download - only works if the Year (span) is visible and statement list is showing
-			console.log(`Attempting to click button with ID:  ${clickableId}`)
-			await page.click(`#${clickableId}`)
+			try {
+				// Delay
+				await delay(randomMs)
+				console.log('Delaying for : ', Math.floor(randomMs / 1000), ' seconds')
 
-			const oldName = await download;
-			const oldPath = path.join(downloadDir, oldName)
-			const newName = `${bank}_${formattedAccount}_${year}_${month}_statement.pdf`
-			const newPath = path.join(downloadDir, newName);
-			renameSync(oldPath, newPath);
-			console.log(`✅ Renamed ${oldName} -> ${newName}`)
+				// Trigger the download - only works if the Year (span) is visible and statement list is showing
+				console.log(`Attempting to click button with ID:  ${clickableId}`)
+				await page.click(`#${clickableId}`)
+
+				const response = await firstResponse;
+				// Ensures the first network call is a success
+				if (!response.ok()) {
+					const body = await response.text().catch(() => 'UNPARSABLE')
+					stmt.error = {
+						kind: 'HTTP_ERROR',
+						status: response.status(),
+						body
+					}
+					console.error(`❌ [${newName}] HTTP ${stmt.error.status}`)
+					continue;
+				}
+
+				const oldName = await download;
+				stmt.fileName = oldName;
+				const oldPath = path.join(downloadDir, oldName)
+				renameSync(oldPath, newPath);
+				console.log(`✅ Renamed ${oldName} -> ${newName}`)
+			} catch (error) {
+				smt.error = {
+					kind: 'EXCEPTION',
+					error: error.message || err,
+				}
+				console.error(`⚠️ [${newName}] error: ${stmt.error.error}`)
+			} finally {
+				cleanupHandler();
+			}
 		}
 	}
 	/* Take an account and initiate statement download for every year */
@@ -261,7 +320,6 @@ const connectToPages = (async (browserWSEndpoint, cleanup) => {
 			};
 		});
 
-
 	/* Process all required accounts */
 	for (const acc of filteredAccList) {
 		const accData = await getAccountData(acc);
@@ -271,6 +329,7 @@ const connectToPages = (async (browserWSEndpoint, cleanup) => {
 		await processAccount(accData)
 		bankData.push(accData);
 	}
+	informErrors(bankData);
 	await browser.disconnect();
 })(browserWSEndpoint, () => {
 	console.log("cleanup invoked)");
