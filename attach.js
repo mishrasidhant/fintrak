@@ -200,8 +200,8 @@ const connectToPages = (async (browserWSEndpoint, cleanup) => {
 				downloadSession.on('Browser.downloadProgress', onDownloadProgress)
 			});
 
-			// First network call made to download statement data
-			const firstResponse = page.waitForResponse(response => response.url() === 'https://online.simplii.com/ebm-ai/api/v1/json/eStatements' && response.request().method() === 'POST', {
+			// First network call made to download statement data - endpoint version differs across account types so use partial url matching
+			const firstResponse = page.waitForResponse(response => response.url().includes('/json/eStatements') && response.request().method() === 'POST', {
 				timeout: 15000
 			})
 
@@ -233,7 +233,7 @@ const connectToPages = (async (browserWSEndpoint, cleanup) => {
 				renameSync(oldPath, newPath);
 				console.log(`✅ Renamed ${oldName} -> ${newName}`)
 			} catch (error) {
-				smt.error = {
+				stmt.error = {
 					kind: 'EXCEPTION',
 					error: error.message || err,
 				}
