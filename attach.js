@@ -60,12 +60,15 @@ const connectToPages = (async (browserWSEndpoint, cleanup) => {
 						);
 						return {
 							spanId: span.getAttribute("id") || null,
+							// Tracks visibliity status ('true' | 'false') of span
+							spanVisible: span.getAttribute("aria-expanded"),
 							selectValue,
 							year: year || null,
 							text: spanText,
 							account: account,
 							formattedAccount: formattedAccount,
-							bank: 'simplii', // TODO make this dynamic when adding support for other banks
+							// TODO make this dynamic when adding support for other banks
+							bank: 'simplii',
 						};
 					});
 			},
@@ -76,6 +79,14 @@ const connectToPages = (async (browserWSEndpoint, cleanup) => {
 		);
 		return accData;
 	};
+	/* Click on span (Year) elements that aren't visible */
+	const makeAllYearsVisible = async function (accData) {
+		for (const acc of accData) {
+			if (acc.spanVisible === 'false') {
+				await page.click(`#${acc.spanId}`)
+			}
+		}
+	}
 	/* Add a list of buttons that match a monthly statement download (belongs to Year within Account) */
 	const getStatementList = async function (acc) {
 		for (const yearData of acc) {
@@ -257,6 +268,7 @@ const connectToPages = (async (browserWSEndpoint, cleanup) => {
 	/* Process all required accounts */
 	for (const acc of filteredAccList) {
 		const accData = await getAccountData(acc);
+		await makeAllYearsVisible(accData);
 		// Process account specific data here!
 		await getStatementList(accData);
 		await processAccount(accData)
