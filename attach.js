@@ -1,6 +1,5 @@
 import puppeteer from "puppeteer";
 import {
-	writeFile,
 	existsSync,
 	mkdirSync,
 	renameSync
@@ -172,10 +171,8 @@ const connectToPages = (async (browserWSEndpoint, cleanup) => {
 			// Delay
 			await delay(randomMs)
 			console.log('Delaying for : ', Math.floor(randomMs / 1000), ' seconds')
-			// Trigger the download
-			await page.waitForSelector(`#${clickableId}`, {
-				visible: true
-			})
+
+			// Trigger the download - only works if the Year (span) is visible and statement list is showing
 			console.log(`Attempting to click button with ID:  ${clickableId}`)
 			await page.click(`#${clickableId}`)
 
