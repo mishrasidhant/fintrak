@@ -1,7 +1,5 @@
 import puppeteer from "puppeteer";
 import {
-	existsSync,
-	mkdirSync,
 	renameSync
 } from "node:fs";
 import {
@@ -9,6 +7,7 @@ import {
 } from "node:url";
 import * as path from "node:path";
 import "dotenv/config";
+import * as utils from "./utils"
 
 const __dirname =
 	path.dirname(fileURLToPath(
@@ -17,15 +16,6 @@ const __dirname =
 const browserWSEndpoint = process.argv[2];
 const downloadDir = path.resolve(__dirname, "download_dir") //  TODO Update this to envar
 
-function delay(ms) {
-	return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function checkDownloadPath(downloadDir) {
-	if (!existsSync(downloadDir)) {
-		mkdirSync(downloadDir)
-	}
-}
 
 function informErrors(bankData) {
 	for (const acc of bankData) {
@@ -207,7 +197,7 @@ const connectToPages = (async (browserWSEndpoint, cleanup) => {
 
 			try {
 				// Delay
-				await delay(randomMs)
+				await utils.delay(randomMs)
 				console.log('Delaying for : ', Math.floor(randomMs / 1000), ' seconds')
 
 				// Trigger the download - only works if the Year (span) is visible and statement list is showing
@@ -252,7 +242,7 @@ const connectToPages = (async (browserWSEndpoint, cleanup) => {
 		}
 	}
 
-	checkDownloadPath(downloadDir)
+	utils.ensurePathExists(downloadDir)
 
 	console.log(browserWSEndpoint);
 
