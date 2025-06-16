@@ -46,7 +46,7 @@ import * as fs from "node:fs"
 // import pdf from "pdf-parse/lib/pdf-parse.js"
 // import {pdfToText} from "pdf-ts"
 // import {readPdfText} from "pdf-text-reader"
-import { getDocument } from "pdfjs-dist/build/pdf.mjs"
+import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs"
 import "dotenv/config";
 import * as utils from "./utils.js"
 
@@ -57,15 +57,16 @@ const __dirname =
 const inputDir = path.resolve(__dirname, "download_dir") //  TODO Update this to envar
 const outputDir = path.resolve(__dirname, "download_dir", "csv") //  TODO Update this to envar
 const pdfFile = process.env.DEV_STATEMENT_PDF_FILE
+const pdfFilePath = `download_dir/${pdfFile}`
 console.log(pdfFile)
 
 utils.ensurePathExists(outputDir)
 
 // 1. Load pdf from file
-const file = fs.readFileSync(`download_dir/${pdfFile}`);
+const file = fs.readFileSync(pdfFilePath);
 console.log(file)
 
-const loadingTask = pdfjsLib.getDocument(file)
+const loadingTask = pdfjs.getDocument(pdfFilePath)
 loadingTask.promise.then((doc)=>{
 	console.log(doc)
 })
