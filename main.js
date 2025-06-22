@@ -10,6 +10,7 @@ async function main(){
   console.log(transactions)
 //   await writeStatementCsv('download_dir/csv/OUTPUT.csv', metadata, transactions)
 //   console.log(`Wrote ${transactions.length} txs for ${metadata.accountNumber}`)
+// test
 }
 
 main().catch(console.error)
