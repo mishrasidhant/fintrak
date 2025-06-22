@@ -142,3 +142,4 @@ download_dir
 *.out
 scratch.js
 run-details.md
+.DS_Store
