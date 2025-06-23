@@ -143,3 +143,5 @@ download_dir
 scratch.js
 run-details.md
 .DS_Store
+# MCP server configurations include PAT that shouldn't be placed in source
+.roo
